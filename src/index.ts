@@ -1,4 +1,5 @@
-import { run } from "./apps/letter-clock";
+import { run as runLetterClock } from "./apps/letter-clock";
+import { run as runNowPlaying } from "./apps/now-playing";
 import { GpioMapping, LedMatrix } from "./module";
 
 const matrix = new LedMatrix(
@@ -22,4 +23,11 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-run(matrix);
+// APP=clock | now-playing (defaults to now-playing when HA_TOKEN is set)
+const app = process.env.APP ?? (process.env.HA_TOKEN ? "now-playing" : "clock");
+
+if (app === "now-playing") {
+  runNowPlaying(matrix);
+} else {
+  runLetterClock(matrix);
+}
