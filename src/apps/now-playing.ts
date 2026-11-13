@@ -26,6 +26,7 @@ const ENTITIES = (process.env.HA_ENTITIES ?? "")
 
 const HEADER_TEXT = "EllieStream";
 const ON_AIR_TEXT = "ON AIR";
+const PAUSED_TEXT = "PAUSED";
 
 const POLL_MS = 2000;
 const FRAME_MS = 40; // scroll speed: 1px per frame (lower = faster)
@@ -166,26 +167,51 @@ function drawHeader(matrix: LedMatrixInstance) {
   matrix.drawText(HEADER_TEXT, x, 0);
 }
 
-/** Red "ON AIR" sign along the bottom edge, shown only while playing. */
-function drawOnAir(matrix: LedMatrixInstance) {
-  matrix.fgColor(0xff2020);
-  matrix.font(headerFont);
-  const x = Math.floor((matrix.width() - headerFont.stringWidth(ON_AIR_TEXT)) / 2);
-  matrix.drawText(ON_AIR_TEXT, x, 24);
+/** Draws text centered horizontally at row y, in the current color. */
+function drawCentered(
+  matrix: LedMatrixInstance,
+  font: InstanceType<typeof Font>,
+  text: string,
+  y: number,
+) {
+  matrix.font(font);
+  const x = Math.floor((matrix.width() - font.stringWidth(text)) / 2);
+  matrix.drawText(text, x, y);
 }
 
+/** Bottom line: red ON AIR while playing, amber PAUSED while paused. */
+function drawStatus(matrix: LedMatrixInstance, text: string, color: number) {
+  matrix.fgColor(color);
+  drawCentered(matrix, headerFont, text, 24);
+}
+
+// Optional IANA time zone, e.g. America/New_York. Defaults to the Pi's own
+// zone, which is often UTC on a fresh install.
+const TIMEZONE = process.env.TIMEZONE || undefined;
+
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
-  hour: "2-digit",
+  hour: "numeric",
   minute: "2-digit",
-  hour12: false,
+  hour12: true,
+  timeZone: TIMEZONE,
+});
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  timeZone: TIMEZONE,
 });
 
+/** Newer Node/Bun versions put a narrow no-break space before AM/PM. */
+const plainSpaces = (s: string) => s.replace(/[^\x20-\x7e]/g, " ");
+
+/** Idle screen: dim 12-hour time in the middle and the date along the bottom. */
 function drawIdle(matrix: LedMatrixInstance) {
-  const t = timeFormatter.format(new Date());
-  matrix.fgColor(0x403000); // dim amber so it's not distracting
-  matrix.font(titleFont);
-  const x = Math.floor((matrix.width() - titleFont.stringWidth(t)) / 2);
-  matrix.drawText(t, x, 12);
+  const now = new Date();
+  matrix.fgColor(0x504000); // dim amber so it's not distracting
+  drawCentered(matrix, titleFont, plainSpaces(timeFormatter.format(now)), 9);
+  matrix.fgColor(0x403000);
+  drawCentered(matrix, headerFont, plainSpaces(dateFormatter.format(now)), 24);
 }
 
 export const run = async (matrix: LedMatrixInstance) => {
@@ -224,7 +250,8 @@ export const run = async (matrix: LedMatrixInstance) => {
         );
         matrix.fgColor(paused ? 0x707070 : 0xffdc00);
         song.draw(matrix, 9);
-        if (!paused) drawOnAir(matrix);
+        if (paused) drawStatus(matrix, PAUSED_TEXT, 0xffa000);
+        else drawStatus(matrix, ON_AIR_TEXT, 0xff2020);
       }
 
       matrix.sync();
