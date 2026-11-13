@@ -205,13 +205,13 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 /** Newer Node/Bun versions put a narrow no-break space before AM/PM. */
 const plainSpaces = (s: string) => s.replace(/[^\x20-\x7e]/g, " ");
 
-/** Idle screen: dim 12-hour time in the middle and the date along the bottom. */
+/** Idle screen (no header): dim 12-hour time with the date underneath. */
 function drawIdle(matrix: LedMatrixInstance) {
   const now = new Date();
   matrix.fgColor(0x504000); // dim amber so it's not distracting
-  drawCentered(matrix, titleFont, plainSpaces(timeFormatter.format(now)), 9);
+  drawCentered(matrix, titleFont, plainSpaces(timeFormatter.format(now)), 4);
   matrix.fgColor(0x403000);
-  drawCentered(matrix, headerFont, plainSpaces(dateFormatter.format(now)), 24);
+  drawCentered(matrix, headerFont, plainSpaces(dateFormatter.format(now)), 21);
 }
 
 export const run = async (matrix: LedMatrixInstance) => {
@@ -239,11 +239,11 @@ export const run = async (matrix: LedMatrixInstance) => {
   try {
     while (true) {
       matrix.clear();
-      drawHeader(matrix);
 
       if (!track) {
         drawIdle(matrix);
       } else {
+        drawHeader(matrix);
         const paused = track.state === "paused";
         song.set(
           track.artist ? `${track.title} by ${track.artist}` : track.title,
