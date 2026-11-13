@@ -1,8 +1,9 @@
 import { Font, type LedMatrixInstance } from "../module";
 import { wait } from "../utils";
+import { OutlineBanner } from "./outline-banner";
 
 /**
- * Now Playing: shows a fading "EllieStream" header with "Song Name by Artist"
+ * Now Playing: shows a blue "EllieStream" header with lights chasing its outline, with "Song Name by Artist"
  * scrolling underneath, for an AirPlay speaker that is exposed to Home
  * Assistant as a media_player entity.
  *
@@ -33,17 +34,6 @@ const FRAME_MS = 40; // scroll speed: 1px per frame (lower = faster)
 const SCROLL_GAP = 24; // px of blank space between marquee repeats
 const SCROLL_PAUSE_FRAMES = 25; // hold at the start before scrolling
 const ALWAYS_SCROLL = true; // scroll even when the text would fit
-
-// Header colors: each one fades in and back out, then the next one starts.
-const HEADER_COLORS: [number, number, number][] = [
-  [0, 200, 255], // cyan
-  [255, 0, 160], // magenta
-  [255, 200, 0], // amber
-  [0, 255, 120], // green
-  [160, 80, 255], // violet
-  [255, 80, 40], // orange-red
-];
-const COLOR_PERIOD_MS = 4000; // time each color takes to fade in and out
 
 const headerFont = new Font("header", "./fonts/spleen-5x8.bdf");
 const titleFont = new Font("title", "./fonts/7x14B.bdf");
@@ -146,25 +136,12 @@ class Marquee {
   }
 }
 
-/** Current header color: one palette entry at a time, fading 0 -> 1 -> 0. */
-function headerColor(now: number): number {
-  const index = Math.floor(now / COLOR_PERIOD_MS) % HEADER_COLORS.length;
-  const t = (now % COLOR_PERIOD_MS) / COLOR_PERIOD_MS;
-  const wave = 0.5 - 0.5 * Math.cos(2 * Math.PI * t); // 0 -> 1 -> 0
-  const level = wave * wave; // squared so the fade looks even on LEDs
-  const [r, g, b] = HEADER_COLORS[index];
-  return (
-    (Math.round(r * level) << 16) |
-    (Math.round(g * level) << 8) |
-    Math.round(b * level)
-  );
-}
-
+/** Plain blue fallback if the outline banner can't be built. */
 function drawHeader(matrix: LedMatrixInstance) {
-  matrix.fgColor(headerColor(Date.now()));
+  matrix.fgColor(0x2f6bff);
   matrix.font(headerFont);
   const x = Math.floor((matrix.width() - headerFont.stringWidth(HEADER_TEXT)) / 2);
-  matrix.drawText(HEADER_TEXT, x, 0);
+  matrix.drawText(HEADER_TEXT, x, 1);
 }
 
 /** Draws text centered horizontally at row y, in the current color. */
@@ -223,6 +200,26 @@ export const run = async (matrix: LedMatrixInstance) => {
 
   const song = new Marquee(titleFont);
 
+  // Blue "EllieStream" with lights chasing around the outline of the letters.
+  let banner: OutlineBanner | null = null;
+  try {
+    banner = new OutlineBanner(
+      {
+        fontPath: "./fonts/spleen-5x8.bdf",
+        text: HEADER_TEXT,
+        top: 1,
+        letterColor: 0x2f6bff,
+        outlineColor: 0x000c3c,
+        chaseColor: [140, 200, 255],
+      },
+      matrix.width(),
+      matrix.height(),
+    );
+  } catch (error) {
+    console.error("now-playing: outline banner unavailable:", error);
+  }
+  let frame = 0;
+
   let track = null as Track | null;
 
   // Poll Home Assistant in the background; rendering never waits on the network.
@@ -243,7 +240,8 @@ export const run = async (matrix: LedMatrixInstance) => {
       if (!track) {
         drawIdle(matrix);
       } else {
-        drawHeader(matrix);
+        if (banner) banner.draw(matrix, frame);
+        else drawHeader(matrix);
         const paused = track.state === "paused";
         song.set(
           track.artist ? `${track.title} by ${track.artist}` : track.title,
@@ -255,6 +253,7 @@ export const run = async (matrix: LedMatrixInstance) => {
       }
 
       matrix.sync();
+      frame++;
       await wait(FRAME_MS);
     }
   } catch (error) {
