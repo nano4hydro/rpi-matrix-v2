@@ -25,6 +25,7 @@ const ENTITIES = (process.env.HA_ENTITIES ?? "")
   .filter(Boolean);
 
 const HEADER_TEXT = "EllieStream";
+const ON_AIR_TEXT = "ON AIR";
 
 const POLL_MS = 2000;
 const FRAME_MS = 40; // scroll speed: 1px per frame (lower = faster)
@@ -162,7 +163,15 @@ function drawHeader(matrix: LedMatrixInstance) {
   matrix.fgColor(headerColor(Date.now()));
   matrix.font(headerFont);
   const x = Math.floor((matrix.width() - headerFont.stringWidth(HEADER_TEXT)) / 2);
-  matrix.drawText(HEADER_TEXT, x, 1);
+  matrix.drawText(HEADER_TEXT, x, 0);
+}
+
+/** Red "ON AIR" sign along the bottom edge, shown only while playing. */
+function drawOnAir(matrix: LedMatrixInstance) {
+  matrix.fgColor(0xff2020);
+  matrix.font(headerFont);
+  const x = Math.floor((matrix.width() - headerFont.stringWidth(ON_AIR_TEXT)) / 2);
+  matrix.drawText(ON_AIR_TEXT, x, 24);
 }
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -176,7 +185,7 @@ function drawIdle(matrix: LedMatrixInstance) {
   matrix.fgColor(0x403000); // dim amber so it's not distracting
   matrix.font(titleFont);
   const x = Math.floor((matrix.width() - titleFont.stringWidth(t)) / 2);
-  matrix.drawText(t, x, 14);
+  matrix.drawText(t, x, 12);
 }
 
 export const run = async (matrix: LedMatrixInstance) => {
@@ -214,7 +223,8 @@ export const run = async (matrix: LedMatrixInstance) => {
           track.artist ? `${track.title} by ${track.artist}` : track.title,
         );
         matrix.fgColor(paused ? 0x707070 : 0xffdc00);
-        song.draw(matrix, 14);
+        song.draw(matrix, 9);
+        if (!paused) drawOnAir(matrix);
       }
 
       matrix.sync();
