@@ -8,11 +8,14 @@ const matrix = new LedMatrix(
     rows: 32,
     cols: 64,
     chainLength: 1,
-    hardwareMapping: GpioMapping.AdafruitHat,
+    // Pi 4 wired straight to the Waveshare panel (no Adafruit bonnet)
+    hardwareMapping: GpioMapping.Regular,
     parallel: 1,
+    disableHardwarePulsing: true,
+    // If colors look wrong, try "RGB" or "GRB"
     ledRgbSequence: "RBG",
   },
-  LedMatrix.defaultRuntimeOptions(),
+  { ...LedMatrix.defaultRuntimeOptions(), gpioSlowdown: 4 },
 );
 
 // Graceful exit on Ctrl+C
